@@ -417,6 +417,7 @@ class IngestionPipeline:
         self,
         batch_size: int = 100,
         priority_first: bool = True,
+        max_pages: int | None = None,
         progress_callback: Callable[[int, int, int], None] | None = None,
     ) -> tuple[int, int, int]:
         """
@@ -429,6 +430,7 @@ class IngestionPipeline:
         Args:
             batch_size: Number of pages to process per batch
             priority_first: If True, start with recently published pages
+            max_pages: Maximum number of pages to process (None = all)
             progress_callback: Callback(processed, success, errors)
 
         Returns:
@@ -446,6 +448,9 @@ class IngestionPipeline:
             query = query.order_by(SvsPage.published_date.desc().nulls_last())
         else:
             query = query.order_by(SvsPage.svs_id)
+
+        if max_pages:
+            query = query.limit(max_pages)
 
         result = await self.session.execute(query)
         pages = result.scalars().all()

@@ -209,6 +209,39 @@ async def cmd_cache_thumbnails(args: argparse.Namespace) -> int:
         return 0 if errors < total else 1
 
 
+async def cmd_reformat(args: argparse.Namespace) -> int:
+    """Reformat pages to extract rich content (content_json)."""
+    logger.info(
+        f"Starting content reformatting (max_pages={args.max_pages}, batch_size={args.batch_size})"
+    )
+
+    def progress(processed: int, success: int, errors: int) -> None:
+        print(
+            f"\rReformatting: {processed} processed, {success} success, {errors} errors",
+            end="",
+            flush=True,
+        )
+
+    async with await get_session() as session:
+        pipeline = IngestionPipeline(session)
+
+        try:
+            processed, success, errors = await pipeline.run_content_update(
+                batch_size=args.batch_size,
+                priority_first=not args.oldest_first,
+                max_pages=args.max_pages,
+                progress_callback=progress,
+            )
+            print()  # Newline after progress
+            logger.info(
+                f"Reformatting complete: {processed} processed, {success} success, {errors} errors"
+            )
+            return 0 if errors == 0 else 1
+        except Exception as e:
+            logger.error(f"Reformatting failed: {e}")
+            return 1
+
+
 async def cmd_test_parse(args: argparse.Namespace) -> int:
     """Test HTML parsing for a specific page."""
     from app.ingestion.html_parser import SvsHtmlParser
@@ -334,6 +367,29 @@ def main() -> int:
         help="Commit after this many pages",
     )
 
+    # reformat command
+    reformat_parser = subparsers.add_parser(
+        "reformat",
+        help="Reformat pages to extract rich content (content_json)",
+    )
+    reformat_parser.add_argument(
+        "--max-pages",
+        type=int,
+        default=None,
+        help="Maximum pages to process (default: all)",
+    )
+    reformat_parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=100,
+        help="Commit after this many pages (default: 100)",
+    )
+    reformat_parser.add_argument(
+        "--oldest-first",
+        action="store_true",
+        help="Process oldest pages first (default: newest first)",
+    )
+
     args = parser.parse_args()
 
     if args.verbose:
@@ -351,6 +407,7 @@ def main() -> int:
         "test-api": cmd_test_api,
         "test-parse": cmd_test_parse,
         "cache-thumbnails": cmd_cache_thumbnails,
+        "reformat": cmd_reformat,
     }
 
     return asyncio.run(commands[args.command](args))

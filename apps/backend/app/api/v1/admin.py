@@ -36,6 +36,13 @@ class IngestRequest(BaseModel):
     max_pages: int | None = Field(None, description="Maximum pages to process")
 
 
+class ContentUpdateRequest(BaseModel):
+    """Content update/reformatting request model."""
+
+    batch_size: int = Field(100, description="Number of pages per batch commit")
+    priority_first: bool = Field(True, description="Process newest pages first")
+
+
 class IngestResponse(BaseModel):
     """Ingestion response model."""
 
@@ -201,3 +208,86 @@ async def list_ingestion_runs(
         )
         for run in runs
     ]
+
+
+class ContentUpdateResponse(BaseModel):
+    """Content update response model."""
+
+    status: str
+    message: str
+    processed: int = 0
+    success: int = 0
+    errors: int = 0
+
+
+# Track content update status (simple in-memory for now)
+_content_update_status: dict[str, ContentUpdateResponse] = {}
+
+
+async def run_content_update_task(
+    task_id: str,
+    batch_size: int,
+    priority_first: bool,
+) -> None:
+    """Background task to run content update."""
+    from app.database import async_session_maker
+
+    _content_update_status[task_id] = ContentUpdateResponse(
+        status="running",
+        message="Content update in progress...",
+    )
+
+    async with async_session_maker() as session:
+        pipeline = IngestionPipeline(session)
+        try:
+            processed, success, errors = await pipeline.run_content_update(
+                batch_size=batch_size,
+                priority_first=priority_first,
+            )
+            _content_update_status[task_id] = ContentUpdateResponse(
+                status="completed",
+                message=f"Content update complete: {processed} processed, {success} success, {errors} errors",
+                processed=processed,
+                success=success,
+                errors=errors,
+            )
+        except Exception as e:
+            _content_update_status[task_id] = ContentUpdateResponse(
+                status="failed",
+                message=f"Content update failed: {e!s}",
+            )
+
+
+@router.post("/ingest/content-update", response_model=ContentUpdateResponse)
+async def start_content_update(
+    request: ContentUpdateRequest,
+    background_tasks: BackgroundTasks,
+    _api_key: str = Depends(verify_api_key),
+) -> ContentUpdateResponse:
+    """
+    Start a content update/reformatting task.
+
+    This re-processes pages that are missing content_json (rich HTML content).
+    Useful for backfilling pages that were crawled before the rich content
+    extraction was implemented.
+
+    Runs asynchronously in the background.
+
+    Requires admin API key authentication.
+    """
+    import uuid
+
+    task_id = str(uuid.uuid4())
+
+    # Start background task
+    background_tasks.add_task(
+        run_content_update_task,
+        task_id,
+        request.batch_size,
+        request.priority_first,
+    )
+
+    return ContentUpdateResponse(
+        status="started",
+        message=f"Content update started. Task ID: {task_id}",
+    )
