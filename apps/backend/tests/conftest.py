@@ -14,8 +14,12 @@ from app.models import Base
 
 settings = get_settings()
 
-# Use a separate test database
-TEST_DATABASE_URL = settings.database_url.replace("/svs_browser", "/svs_browser_test")
+# Use the DATABASE_URL as-is if it already points to a test database,
+# otherwise append _test to the database name
+if settings.database_url.endswith("_test"):
+    TEST_DATABASE_URL = settings.database_url
+else:
+    TEST_DATABASE_URL = settings.database_url.replace("/svs_browser", "/svs_browser_test")
 
 
 @pytest.fixture(scope="session")
