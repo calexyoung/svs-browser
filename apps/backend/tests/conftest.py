@@ -21,30 +21,31 @@ else:
     TEST_DATABASE_URL = settings.database_url.replace("/svs_browser", "/svs_browser_test")
 
 
-# Create engine once for all tests
-_test_engine = None
-_async_session_maker = None
-
-
-@pytest_asyncio.fixture(scope="function")
+@pytest_asyncio.fixture
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
-    """Create a test database session."""
-    global _test_engine, _async_session_maker
+    """Create a test database session with fresh engine per test."""
+    # Create fresh engine for each test to avoid event loop issues
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 
-    if _test_engine is None:
-        _test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-        _async_session_maker = async_sessionmaker(
-            _test_engine,
-            class_=AsyncSession,
-            expire_on_commit=False,
-        )
-        # Create tables
-        async with _test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+    # Create tables
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-    async with _async_session_maker() as session:
+    async_session_maker = async_sessionmaker(
+        engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+
+    async with async_session_maker() as session:
         yield session
         await session.rollback()
+
+    # Clean up
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+    await engine.dispose()
 
 
 @pytest_asyncio.fixture
