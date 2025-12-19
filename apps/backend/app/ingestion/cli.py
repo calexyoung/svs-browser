@@ -211,9 +211,7 @@ async def cmd_cache_thumbnails(args: argparse.Namespace) -> int:
 
 async def cmd_reformat(args: argparse.Namespace) -> int:
     """Reformat pages to extract rich content (content_json)."""
-    logger.info(
-        f"Starting content reformatting (max_pages={args.max_pages}, batch_size={args.batch_size})"
-    )
+    logger.info(f"Starting content reformatting (max_pages={args.max_pages}, batch_size={args.batch_size})")
 
     def progress(processed: int, success: int, errors: int) -> None:
         print(
@@ -233,9 +231,7 @@ async def cmd_reformat(args: argparse.Namespace) -> int:
                 progress_callback=progress,
             )
             print()  # Newline after progress
-            logger.info(
-                f"Reformatting complete: {processed} processed, {success} success, {errors} errors"
-            )
+            logger.info(f"Reformatting complete: {processed} processed, {success} success, {errors} errors")
             return 0 if errors == 0 else 1
         except Exception as e:
             logger.error(f"Reformatting failed: {e}")
