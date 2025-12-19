@@ -1,15 +1,15 @@
 """Page service for database operations."""
+
 from __future__ import annotations
 
-
+from collections.abc import Sequence
 from datetime import date
-from typing import Sequence
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import Asset, AssetFile, AssetThumbnail, PageTag, SvsPage, SvsPageRelation, Tag
+from app.models import Asset, PageTag, SvsPage, SvsPageRelation, Tag
 from app.schemas.page import (
     AssetBrief,
     AssetFileResponse,
@@ -42,9 +42,7 @@ class PageService:
                 selectinload(SvsPage.assets).selectinload(Asset.files),
                 selectinload(SvsPage.assets).selectinload(Asset.thumbnails),
                 selectinload(SvsPage.tags).selectinload(PageTag.tag),
-                selectinload(SvsPage.related_pages_from).selectinload(
-                    SvsPageRelation.target_page
-                ),
+                selectinload(SvsPage.related_pages_from).selectinload(SvsPageRelation.target_page),
             )
             .where(SvsPage.svs_id == svs_id)
         )
@@ -93,9 +91,7 @@ class PageService:
                 )
 
         # Format tags
-        tags = [
-            TagInfo(type=pt.tag.tag_type, value=pt.tag.value) for pt in page.tags
-        ]
+        tags = [TagInfo(type=pt.tag.tag_type, value=pt.tag.value) for pt in page.tags]
 
         # Format assets with captions
         assets = []
@@ -183,11 +179,7 @@ class PageService:
         if media_types:
             media_type_values = [mt.value for mt in media_types]
             base_query = base_query.where(
-                SvsPage.svs_id.in_(
-                    select(Asset.svs_id)
-                    .where(Asset.media_type.in_(media_type_values))
-                    .distinct()
-                )
+                SvsPage.svs_id.in_(select(Asset.svs_id).where(Asset.media_type.in_(media_type_values)).distinct())
             )
 
         # Domain/mission filter (requires join to tags)
@@ -320,12 +312,7 @@ class PageService:
         total_count = count_result.scalar() or 0
 
         # Data query
-        query = (
-            select(SvsPage)
-            .order_by(SvsPage.svs_id.desc())
-            .offset(offset)
-            .limit(limit)
-        )
+        query = select(SvsPage).order_by(SvsPage.svs_id.desc()).offset(offset).limit(limit)
         result = await self.session.execute(query)
         pages = result.scalars().all()
 

@@ -2,7 +2,6 @@
 
 import asyncio
 from collections.abc import AsyncGenerator, Generator
-from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -16,9 +15,7 @@ from app.models import Base
 settings = get_settings()
 
 # Use a separate test database
-TEST_DATABASE_URL = settings.database_url.replace(
-    "/svs_browser", "/svs_browser_test"
-)
+TEST_DATABASE_URL = settings.database_url.replace("/svs_browser", "/svs_browser_test")
 
 
 @pytest.fixture(scope="session")

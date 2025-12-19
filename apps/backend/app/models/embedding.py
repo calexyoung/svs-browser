@@ -1,6 +1,6 @@
 """Embedding models for vector storage."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 from uuid import UUID
 
@@ -29,9 +29,7 @@ class Embedding(Base, TimestampMixin):
     is_current: Mapped[bool] = mapped_column(default=True)
 
     __table_args__ = (
-        CheckConstraint(
-            "chunk_type IN ('page', 'asset')", name="valid_chunk_type"
-        ),
+        CheckConstraint("chunk_type IN ('page', 'asset')", name="valid_chunk_type"),
         Index(
             "ix_embedding_hnsw",
             "embedding",

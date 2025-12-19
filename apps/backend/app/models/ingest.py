@@ -1,6 +1,6 @@
 """Ingestion tracking models."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
@@ -41,9 +41,7 @@ class IngestRun(Base, TimestampMixin):
         server_default=text("gen_random_uuid()"),
     )
     mode: Mapped[str] = mapped_column(String(20))
-    status: Mapped[str] = mapped_column(
-        String(20), default=IngestRunStatus.PENDING.value
-    )
+    status: Mapped[str] = mapped_column(String(20), default=IngestRunStatus.PENDING.value)
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
@@ -61,9 +59,7 @@ class IngestRun(Base, TimestampMixin):
     error_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships
-    items: Mapped[list["IngestItem"]] = relationship(
-        "IngestItem", back_populates="run", cascade="all, delete-orphan"
-    )
+    items: Mapped[list[IngestItem]] = relationship("IngestItem", back_populates="run", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_ingest_run_status", "status"),
@@ -100,13 +96,9 @@ class IngestItem(Base, TimestampMixin):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    run_id: Mapped[UUID] = mapped_column(
-        ForeignKey("ingest_run.run_id", ondelete="CASCADE")
-    )
+    run_id: Mapped[UUID] = mapped_column(ForeignKey("ingest_run.run_id", ondelete="CASCADE"))
     svs_id: Mapped[int] = mapped_column()
-    status: Mapped[str] = mapped_column(
-        String(20), default=IngestItemStatus.PENDING.value
-    )
+    status: Mapped[str] = mapped_column(String(20), default=IngestItemStatus.PENDING.value)
     phase: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     # Timing
@@ -118,7 +110,7 @@ class IngestItem(Base, TimestampMixin):
     retry_count: Mapped[int] = mapped_column(default=0)
 
     # Relationships
-    run: Mapped["IngestRun"] = relationship("IngestRun", back_populates="items")
+    run: Mapped[IngestRun] = relationship("IngestRun", back_populates="items")
 
     __table_args__ = (
         Index("ix_ingest_item_run_id", "run_id"),

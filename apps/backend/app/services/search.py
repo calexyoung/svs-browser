@@ -1,18 +1,16 @@
 """Search service with PostgreSQL full-text search."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 import logging
 import re
 from datetime import date
-from typing import Any
 
-from sqlalchemy import Float, String, and_, case, cast, func, literal, or_, select, text
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy import and_, case, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import Asset, AssetThumbnail, PageTag, SvsPage, Tag
+from app.models import Asset, PageTag, SvsPage, Tag
 from app.schemas.page import (
     MediaType,
     SearchFacets,
@@ -55,12 +53,9 @@ class SearchService:
         search_term = self._prepare_search_term(query)
 
         # Base query with FTS - only include crawled pages with content
-        base_query = (
-            select(SvsPage)
-            .where(
-                SvsPage.status == "active",
-                SvsPage.html_crawled_at.isnot(None),  # Only crawled pages
-            )
+        base_query = select(SvsPage).where(
+            SvsPage.status == "active",
+            SvsPage.html_crawled_at.isnot(None),  # Only crawled pages
         )
 
         # Add text search condition
@@ -119,9 +114,7 @@ class SearchService:
                 base_query = base_query.where(min_relevance_filter)
 
         # Apply filters
-        base_query = self._apply_filters(
-            base_query, media_types, domain, mission, date_from, date_to
-        )
+        base_query = self._apply_filters(base_query, media_types, domain, mission, date_from, date_to)
 
         # Get total count before pagination
         count_query = select(func.count()).select_from(base_query.subquery())
@@ -152,8 +145,7 @@ class SearchService:
 
         # Build pagination URLs
         next_url, prev_url = self._build_pagination_urls(
-            query, media_types, domain, mission, date_from, date_to,
-            sort, limit, offset, total_count
+            query, media_types, domain, mission, date_from, date_to, sort, limit, offset, total_count
         )
 
         return SearchResponse(
@@ -164,9 +156,7 @@ class SearchService:
             previous=prev_url,
         )
 
-    async def _search_by_id(
-        self, svs_id: int, limit: int, offset: int
-    ) -> SearchResponse:
+    async def _search_by_id(self, svs_id: int, limit: int, offset: int) -> SearchResponse:
         """Search for a specific SVS ID."""
         query = (
             select(SvsPage)
@@ -233,24 +223,20 @@ class SearchService:
     def _is_boolean_query(self, query: str) -> bool:
         """Check if query contains boolean operators."""
         # Check for OR, quotes, or minus prefix
-        return bool(
-            re.search(r'\bOR\b', query, re.IGNORECASE) or
-            '"' in query or
-            re.search(r'(^|\s)-\w', query)
-        )
+        return bool(re.search(r"\bOR\b", query, re.IGNORECASE) or '"' in query or re.search(r"(^|\s)-\w", query))
 
     def _extract_search_words(self, query: str) -> list[str]:
         """Extract individual search words (non-excluded) from a boolean query."""
         # Remove boolean operators and extract words
-        cleaned = re.sub(r'\bOR\b', ' ', query, flags=re.IGNORECASE)
-        cleaned = re.sub(r'-\w+', '', cleaned)  # Remove excluded terms
+        cleaned = re.sub(r"\bOR\b", " ", query, flags=re.IGNORECASE)
+        cleaned = re.sub(r"-\w+", "", cleaned)  # Remove excluded terms
         # Extract words and quoted phrases
         words = re.findall(r'"([^"]+)"|(\w+)', cleaned)
         return [w[0] or w[1] for w in words if w[0] or w[1]]
 
     def _extract_excluded_words(self, query: str) -> list[str]:
         """Extract words that should be excluded (prefixed with -)."""
-        matches = re.findall(r'(?:^|\s)-(\w+)', query)
+        matches = re.findall(r"(?:^|\s)-(\w+)", query)
         return matches
 
     def _apply_filters(
@@ -272,11 +258,7 @@ class SearchService:
         # Media type filter
         if media_types:
             media_type_values = [mt.value for mt in media_types]
-            subq = (
-                select(Asset.svs_id)
-                .where(Asset.media_type.in_(media_type_values))
-                .distinct()
-            )
+            subq = select(Asset.svs_id).where(Asset.media_type.in_(media_type_values)).distinct()
             query = query.where(SvsPage.svs_id.in_(subq))
 
         # Domain filter
@@ -308,21 +290,12 @@ class SearchService:
     def _apply_sorting(self, query, sort: SortOption, search_term: str | None):
         """Apply sorting to query."""
         # Boost for crawled pages with thumbnails (prioritize complete pages)
-        has_thumbnail = case(
-            (SvsPage.thumbnail_url.isnot(None), 1),
-            else_=0
-        )
+        has_thumbnail = case((SvsPage.thumbnail_url.isnot(None), 1), else_=0)
 
         if sort == SortOption.DATE_DESC:
-            return query.order_by(
-                has_thumbnail.desc(),
-                SvsPage.published_date.desc().nulls_last()
-            )
+            return query.order_by(has_thumbnail.desc(), SvsPage.published_date.desc().nulls_last())
         elif sort == SortOption.DATE_ASC:
-            return query.order_by(
-                has_thumbnail.desc(),
-                SvsPage.published_date.asc().nulls_last()
-            )
+            return query.order_by(has_thumbnail.desc(), SvsPage.published_date.asc().nulls_last())
         else:
             # Relevance sorting - use ts_rank if we have a search term
             if search_term:
@@ -331,19 +304,14 @@ class SearchService:
 
                 # Calculate a combined relevance score that also considers ILIKE matches
                 # Pages matching in title get a boost even without tsvector match
-                title_match_boost = case(
-                    (SvsPage.title.ilike(f"%{search_term}%"), 0.1),
-                    else_=0.0
-                )
+                title_match_boost = case((SvsPage.title.ilike(f"%{search_term}%"), 0.1), else_=0.0)
                 combined_rank = rank + title_match_boost
 
                 return query.order_by(has_thumbnail.desc(), combined_rank.desc(), SvsPage.svs_id.desc())
             else:
                 return query.order_by(has_thumbnail.desc(), SvsPage.svs_id.desc())
 
-    def _format_results(
-        self, pages: list[SvsPage], query: str
-    ) -> list[SearchResult]:
+    def _format_results(self, pages: list[SvsPage], query: str) -> list[SearchResult]:
         """Format page results for API response."""
         results = []
 
@@ -369,17 +337,19 @@ class SearchService:
             # Calculate relevance score (simplified)
             score = self._calculate_score(page, query)
 
-            results.append(SearchResult(
-                svs_id=page.svs_id,
-                title=page.title,
-                snippet=snippet,
-                published_date=page.published_date,
-                canonical_url=page.canonical_url,
-                thumbnail_url=thumbnail_url,
-                media_types=media_types,
-                tags=tags,
-                score=score,
-            ))
+            results.append(
+                SearchResult(
+                    svs_id=page.svs_id,
+                    title=page.title,
+                    snippet=snippet,
+                    published_date=page.published_date,
+                    canonical_url=page.canonical_url,
+                    thumbnail_url=thumbnail_url,
+                    media_types=media_types,
+                    tags=tags,
+                    score=score,
+                )
+            )
 
         return results
 

@@ -1,6 +1,6 @@
 """Database configuration and session management."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 

@@ -1,6 +1,6 @@
 """HTML parser for extracting content from SVS pages."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 import json
 import logging
@@ -15,8 +15,8 @@ from bs4 import BeautifulSoup, Tag
 logger = logging.getLogger(__name__)
 
 # Allowed HTML tags and attributes for sanitization
-ALLOWED_TAGS = ['p', 'br', 'a', 'strong', 'b', 'em', 'i', 'ul', 'ol', 'li', 'span']
-ALLOWED_ATTRS = {'a': ['href', 'title', 'data-internal']}
+ALLOWED_TAGS = ["p", "br", "a", "strong", "b", "em", "i", "ul", "ol", "li", "span"]
+ALLOWED_ATTRS = {"a": ["href", "title", "data-internal"]}
 
 SVS_BASE_URL = "https://svs.gsfc.nasa.gov"
 
@@ -282,12 +282,7 @@ class SvsHtmlParser:
                     text = self._clean_text(p.get_text())
                     if text and len(text) > 20:  # Skip very short text
                         # Sanitize HTML to only allow safe tags
-                        html = bleach.clean(
-                            str(p),
-                            tags=ALLOWED_TAGS,
-                            attributes=ALLOWED_ATTRS,
-                            strip=True
-                        )
+                        html = bleach.clean(str(p), tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS, strip=True)
                         paragraphs.append({"html": html, "text": text})
 
             # Also check for standalone description divs
@@ -303,12 +298,7 @@ class SvsHtmlParser:
 
                     text = self._clean_text(p.get_text())
                     if text and len(text) > 20:
-                        html = bleach.clean(
-                            str(p),
-                            tags=ALLOWED_TAGS,
-                            attributes=ALLOWED_ATTRS,
-                            strip=True
-                        )
+                        html = bleach.clean(str(p), tags=ALLOWED_TAGS, attributes=ALLOWED_ATTRS, strip=True)
                         # Deduplicate based on text content
                         if not any(para["text"] == text for para in paragraphs):
                             paragraphs.append({"html": html, "text": text})
@@ -428,18 +418,23 @@ class SvsHtmlParser:
                         authors = [authors]
                     for author in authors:
                         if isinstance(author, dict) and "name" in author:
-                            credits.append(ParsedCredit(
-                                role="Author",
-                                name=author["name"],
-                                organization=author.get("affiliation", {}).get("name")
-                                if isinstance(author.get("affiliation"), dict) else None,
-                            ))
+                            credits.append(
+                                ParsedCredit(
+                                    role="Author",
+                                    name=author["name"],
+                                    organization=author.get("affiliation", {}).get("name")
+                                    if isinstance(author.get("affiliation"), dict)
+                                    else None,
+                                )
+                            )
                         elif isinstance(author, str):
-                            credits.append(ParsedCredit(
-                                role="Author",
-                                name=author,
-                                organization=None,
-                            ))
+                            credits.append(
+                                ParsedCredit(
+                                    role="Author",
+                                    name=author,
+                                    organization=None,
+                                )
+                            )
                 # Check for contributor field
                 if "contributor" in data:
                     contributors = data["contributor"]
@@ -447,12 +442,15 @@ class SvsHtmlParser:
                         contributors = [contributors]
                     for contrib in contributors:
                         if isinstance(contrib, dict) and "name" in contrib:
-                            credits.append(ParsedCredit(
-                                role=contrib.get("jobTitle", "Contributor"),
-                                name=contrib["name"],
-                                organization=contrib.get("affiliation", {}).get("name")
-                                if isinstance(contrib.get("affiliation"), dict) else None,
-                            ))
+                            credits.append(
+                                ParsedCredit(
+                                    role=contrib.get("jobTitle", "Contributor"),
+                                    name=contrib["name"],
+                                    organization=contrib.get("affiliation", {}).get("name")
+                                    if isinstance(contrib.get("affiliation"), dict)
+                                    else None,
+                                )
+                            )
             except (json.JSONDecodeError, TypeError, KeyError):
                 pass
 
@@ -480,11 +478,13 @@ class SvsHtmlParser:
                 for link in credit_list.find_all("a", href=re.compile(r"/search\?people=")):
                     name = link.get_text(strip=True)
                     if name and role:
-                        credits.append(ParsedCredit(
-                            role=role,
-                            name=name,
-                            organization=None,
-                        ))
+                        credits.append(
+                            ParsedCredit(
+                                role=role,
+                                name=name,
+                                organization=None,
+                            )
+                        )
 
         # 3. Look for header spans/divs with credit info
         header = soup.find("header") or soup.find("div", class_="header")
@@ -499,12 +499,14 @@ class SvsHtmlParser:
                     org_match = re.search(r"\(([^)]+)\)$", name)
                     org = org_match.group(1) if org_match else None
                     if org_match:
-                        name = name[:org_match.start()].strip()
-                    credits.append(ParsedCredit(
-                        role=role.strip(),
-                        name=name.strip(),
-                        organization=org,
-                    ))
+                        name = name[: org_match.start()].strip()
+                    credits.append(
+                        ParsedCredit(
+                            role=role.strip(),
+                            name=name.strip(),
+                            organization=org,
+                        )
+                    )
 
         # 4. Look in the dedicated credits section
         credits_section = soup.find("section", id="section_credits")
@@ -526,13 +528,15 @@ class SvsHtmlParser:
                         org_match = re.search(r"\(([^)]+)\)$", name)
                         org = org_match.group(1) if org_match else None
                         if org_match:
-                            name = name[:org_match.start()].strip()
+                            name = name[: org_match.start()].strip()
 
-                        credits.append(ParsedCredit(
-                            role=current_role,
-                            name=name,
-                            organization=org,
-                        ))
+                        credits.append(
+                            ParsedCredit(
+                                role=current_role,
+                                name=name,
+                                organization=org,
+                            )
+                        )
 
         # 5. Look for credit info in description area (some pages embed credits there)
         for media_group in soup.find_all("section", id=re.compile(r"media_group_\d+")):
@@ -552,9 +556,16 @@ class SvsHtmlParser:
                                 role_match = re.search(r"\(([^)]+)\)$", part)
                                 if role_match:
                                     org_or_role = role_match.group(1)
-                                    name = part[:role_match.start()].strip()
+                                    name = part[: role_match.start()].strip()
                                     # Guess if it's a role or org
-                                    role_keywords = ["animator", "visualiz", "lead", "director", "producer", "scientist"]
+                                    role_keywords = [
+                                        "animator",
+                                        "visualiz",
+                                        "lead",
+                                        "director",
+                                        "producer",
+                                        "scientist",
+                                    ]
                                     if any(kw in org_or_role.lower() for kw in role_keywords):
                                         credits.append(ParsedCredit(role=org_or_role, name=name, organization=None))
                                     else:
@@ -599,12 +610,38 @@ class SvsHtmlParser:
         # We detect them by common mission names
         missions = []
         known_missions = {
-            "MAVEN", "Hubble", "Webb", "JWST", "Cassini", "Curiosity",
-            "Perseverance", "Mars Reconnaissance Orbiter", "MRO", "LRO",
-            "TESS", "Kepler", "Spitzer", "Chandra", "Fermi", "SDO",
-            "SOHO", "ACE", "STEREO", "Parker Solar Probe", "New Horizons",
-            "Juno", "Europa Clipper", "OSIRIS-REx", "GOES", "Landsat",
-            "Terra", "Aqua", "NOAA", "GPM", "ICESat", "GRACE",
+            "MAVEN",
+            "Hubble",
+            "Webb",
+            "JWST",
+            "Cassini",
+            "Curiosity",
+            "Perseverance",
+            "Mars Reconnaissance Orbiter",
+            "MRO",
+            "LRO",
+            "TESS",
+            "Kepler",
+            "Spitzer",
+            "Chandra",
+            "Fermi",
+            "SDO",
+            "SOHO",
+            "ACE",
+            "STEREO",
+            "Parker Solar Probe",
+            "New Horizons",
+            "Juno",
+            "Europa Clipper",
+            "OSIRIS-REx",
+            "GOES",
+            "Landsat",
+            "Terra",
+            "Aqua",
+            "NOAA",
+            "GPM",
+            "ICESat",
+            "GRACE",
         }
 
         tags = self._extract_article_tags(soup)
@@ -622,10 +659,28 @@ class SvsHtmlParser:
         """Extract celestial body targets from tags."""
         targets = []
         known_targets = {
-            "Earth", "Moon", "Sun", "Mars", "Jupiter", "Saturn",
-            "Venus", "Mercury", "Uranus", "Neptune", "Pluto",
-            "Europa", "Titan", "Enceladus", "Io", "Ganymede", "Callisto",
-            "Ceres", "Vesta", "Bennu", "Ryugu", "Comet",
+            "Earth",
+            "Moon",
+            "Sun",
+            "Mars",
+            "Jupiter",
+            "Saturn",
+            "Venus",
+            "Mercury",
+            "Uranus",
+            "Neptune",
+            "Pluto",
+            "Europa",
+            "Titan",
+            "Enceladus",
+            "Io",
+            "Ganymede",
+            "Callisto",
+            "Ceres",
+            "Vesta",
+            "Bennu",
+            "Ryugu",
+            "Comet",
         }
 
         tags = self._extract_article_tags(soup)
@@ -642,10 +697,25 @@ class SvsHtmlParser:
         """Extract scientific domains from tags."""
         domains = []
         known_domains = {
-            "Earth Science", "Heliophysics", "Astrophysics", "Planetary Science",
-            "Climate", "Weather", "Atmosphere", "Ocean", "Land", "Ice",
-            "Solar", "Space Weather", "Galaxies", "Black Holes", "Stars",
-            "Exoplanets", "Nebulae", "Universe", "Cosmology",
+            "Earth Science",
+            "Heliophysics",
+            "Astrophysics",
+            "Planetary Science",
+            "Climate",
+            "Weather",
+            "Atmosphere",
+            "Ocean",
+            "Land",
+            "Ice",
+            "Solar",
+            "Space Weather",
+            "Galaxies",
+            "Black Holes",
+            "Stars",
+            "Exoplanets",
+            "Nebulae",
+            "Universe",
+            "Cosmology",
         }
 
         tags = self._extract_article_tags(soup)
@@ -716,12 +786,14 @@ class SvsHtmlParser:
                 src = source.get("src")
                 if src:
                     url = urljoin(SVS_BASE_URL, src)
-                    files.append(ParsedAssetFile(
-                        variant=self._detect_variant(url),
-                        url=url,
-                        mime_type=source.get("type"),
-                        filename=url.split("/")[-1] if "/" in url else None,
-                    ))
+                    files.append(
+                        ParsedAssetFile(
+                            variant=self._detect_variant(url),
+                            url=url,
+                            mime_type=source.get("type"),
+                            filename=url.split("/")[-1] if "/" in url else None,
+                        )
+                    )
 
         if not files and not thumbnail_url:
             return None
@@ -830,11 +902,13 @@ class SvsHtmlParser:
                     svs_id = int(match.group(1))
                     title = link.get_text(strip=True)
                     if title:
-                        related.append(ParsedRelatedPage(
-                            svs_id=svs_id,
-                            title=title,
-                            relation_type="related",
-                        ))
+                        related.append(
+                            ParsedRelatedPage(
+                                svs_id=svs_id,
+                                title=title,
+                                relation_type="related",
+                            )
+                        )
 
         # Also look at prev/next navigation
         nav_row = soup.find("nav", class_="row")
@@ -846,11 +920,13 @@ class SvsHtmlParser:
                     svs_id = int(match.group(1))
                     title = link.get_text(strip=True)
                     if title and not title.startswith("bi-"):
-                        related.append(ParsedRelatedPage(
-                            svs_id=svs_id,
-                            title=title,
-                            relation_type="sequence",
-                        ))
+                        related.append(
+                            ParsedRelatedPage(
+                                svs_id=svs_id,
+                                title=title,
+                                relation_type="sequence",
+                            )
+                        )
 
         return related
 

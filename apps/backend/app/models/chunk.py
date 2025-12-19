@@ -1,6 +1,6 @@
 """Text chunk models for RAG."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -44,9 +44,7 @@ class PageTextChunk(Base, TimestampMixin):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    svs_id: Mapped[int] = mapped_column(
-        ForeignKey("svs_page.svs_id", ondelete="CASCADE")
-    )
+    svs_id: Mapped[int] = mapped_column(ForeignKey("svs_page.svs_id", ondelete="CASCADE"))
     section: Mapped[str] = mapped_column(String(50))
     chunk_index: Mapped[int] = mapped_column()
     content: Mapped[str] = mapped_column(Text)
@@ -54,11 +52,10 @@ class PageTextChunk(Base, TimestampMixin):
     content_hash: Mapped[str] = mapped_column(String(64))  # SHA-256 hash
 
     # Relationships
-    page: Mapped["SvsPage"] = relationship("SvsPage", back_populates="text_chunks")
-    embeddings: Mapped[list["Embedding"]] = relationship(
+    page: Mapped[SvsPage] = relationship("SvsPage", back_populates="text_chunks")
+    embeddings: Mapped[list[Embedding]] = relationship(
         "Embedding",
-        primaryjoin="and_(PageTextChunk.chunk_id == foreign(Embedding.chunk_id), "
-        "Embedding.chunk_type == 'page')",
+        primaryjoin="and_(PageTextChunk.chunk_id == foreign(Embedding.chunk_id), Embedding.chunk_type == 'page')",
         viewonly=True,
     )
 
@@ -78,9 +75,7 @@ class AssetTextChunk(Base, TimestampMixin):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    asset_id: Mapped[UUID] = mapped_column(
-        ForeignKey("asset.asset_id", ondelete="CASCADE")
-    )
+    asset_id: Mapped[UUID] = mapped_column(ForeignKey("asset.asset_id", ondelete="CASCADE"))
     section: Mapped[str] = mapped_column(String(50))
     chunk_index: Mapped[int] = mapped_column()
     content: Mapped[str] = mapped_column(Text)
@@ -88,11 +83,10 @@ class AssetTextChunk(Base, TimestampMixin):
     content_hash: Mapped[str] = mapped_column(String(64))
 
     # Relationships
-    asset: Mapped["Asset"] = relationship("Asset", back_populates="text_chunks")
-    embeddings: Mapped[list["Embedding"]] = relationship(
+    asset: Mapped[Asset] = relationship("Asset", back_populates="text_chunks")
+    embeddings: Mapped[list[Embedding]] = relationship(
         "Embedding",
-        primaryjoin="and_(AssetTextChunk.chunk_id == foreign(Embedding.chunk_id), "
-        "Embedding.chunk_type == 'asset')",
+        primaryjoin="and_(AssetTextChunk.chunk_id == foreign(Embedding.chunk_id), Embedding.chunk_type == 'asset')",
         viewonly=True,
     )
 

@@ -1,4 +1,5 @@
 """Embedding generation pipeline for text chunks."""
+
 from __future__ import annotations
 
 import asyncio
@@ -7,10 +8,10 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.chunk import PageTextChunk, AssetTextChunk
+from app.models.chunk import AssetTextChunk, PageTextChunk
 from app.models.embedding import Embedding
 from app.services.embedding import get_embedding_service
 
@@ -33,22 +34,22 @@ class EmbeddingPipeline:
     ) -> list[tuple[UUID, str]]:
         """Get chunks that don't have current embeddings."""
         if chunk_type == "page":
-            ChunkModel = PageTextChunk
+            chunk_model = PageTextChunk
         else:
-            ChunkModel = AssetTextChunk
+            chunk_model = AssetTextChunk
 
         # Find chunks without current embeddings for this model
         subquery = (
             select(Embedding.chunk_id)
             .where(Embedding.chunk_type == chunk_type)
             .where(Embedding.model_name == self.embedding_service.model_name)
-            .where(Embedding.is_current == True)
+            .where(Embedding.is_current.is_(True))
         )
 
         query = (
-            select(ChunkModel.chunk_id, ChunkModel.content)
-            .where(~ChunkModel.chunk_id.in_(subquery))
-            .order_by(ChunkModel.chunk_id)
+            select(chunk_model.chunk_id, chunk_model.content)
+            .where(~chunk_model.chunk_id.in_(subquery))
+            .order_by(chunk_model.chunk_id)
         )
 
         if limit:
@@ -60,20 +61,18 @@ class EmbeddingPipeline:
     async def count_chunks_without_embeddings(self, chunk_type: str = "page") -> int:
         """Count chunks that need embeddings."""
         if chunk_type == "page":
-            ChunkModel = PageTextChunk
+            chunk_model = PageTextChunk
         else:
-            ChunkModel = AssetTextChunk
+            chunk_model = AssetTextChunk
 
         subquery = (
             select(Embedding.chunk_id)
             .where(Embedding.chunk_type == chunk_type)
             .where(Embedding.model_name == self.embedding_service.model_name)
-            .where(Embedding.is_current == True)
+            .where(Embedding.is_current.is_(True))
         )
 
-        query = select(func.count()).select_from(ChunkModel).where(
-            ~ChunkModel.chunk_id.in_(subquery)
-        )
+        query = select(func.count()).select_from(chunk_model).where(~chunk_model.chunk_id.in_(subquery))
 
         result = await self.session.execute(query)
         return result.scalar() or 0
@@ -92,9 +91,7 @@ class EmbeddingPipeline:
 
         try:
             # Generate embeddings
-            embeddings = await self.embedding_service.batch_generate_embeddings(
-                texts, batch_size=self.batch_size
-            )
+            embeddings = await self.embedding_service.batch_generate_embeddings(texts, batch_size=self.batch_size)
 
             # Create embedding records
             for chunk_id, embedding_vector in zip(chunk_ids, embeddings):
@@ -149,9 +146,7 @@ class EmbeddingPipeline:
 
         while processed < total_to_process:
             batch_limit = min(self.batch_size, total_to_process - processed)
-            chunks = await self.get_chunks_without_embeddings(
-                chunk_type=chunk_type, limit=batch_limit
-            )
+            chunks = await self.get_chunks_without_embeddings(chunk_type=chunk_type, limit=batch_limit)
 
             if not chunks:
                 break
@@ -168,16 +163,13 @@ class EmbeddingPipeline:
                 rate = processed / elapsed if elapsed > 0 else 0
                 logger.info(
                     f"Progress: {processed}/{total_to_process} chunks "
-                    f"({processed/total_to_process*100:.1f}%) - {rate:.1f} chunks/sec"
+                    f"({processed / total_to_process * 100:.1f}%) - {rate:.1f} chunks/sec"
                 )
 
         elapsed = (datetime.now() - start_time).total_seconds()
         rate = processed / elapsed if elapsed > 0 else 0
 
-        logger.info(
-            f"Embedding pipeline complete: {processed} chunks in {elapsed:.1f}s "
-            f"({rate:.1f} chunks/sec)"
-        )
+        logger.info(f"Embedding pipeline complete: {processed} chunks in {elapsed:.1f}s ({rate:.1f} chunks/sec)")
 
         return {
             "total_processed": processed,

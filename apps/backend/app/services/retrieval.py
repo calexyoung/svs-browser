@@ -1,4 +1,5 @@
 """Hybrid retrieval service combining keyword and vector search for RAG."""
+
 from __future__ import annotations
 
 import logging
@@ -6,8 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from pgvector.sqlalchemy import Vector
-from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy import and_, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chunk import PageTextChunk
@@ -84,9 +84,7 @@ class RetrievalService:
         filtered = [r for r in combined if r.combined_score >= min_score]
         return sorted(filtered, key=lambda x: x.combined_score, reverse=True)[:top_k]
 
-    async def _keyword_search(
-        self, query: str, top_k: int = 20
-    ) -> dict[UUID, tuple[float, PageTextChunk, SvsPage]]:
+    async def _keyword_search(self, query: str, top_k: int = 20) -> dict[UUID, tuple[float, PageTextChunk, SvsPage]]:
         """
         Search chunks using PostgreSQL full-text search.
 
@@ -156,7 +154,7 @@ class RetrievalService:
                 and_(
                     Embedding.chunk_id == PageTextChunk.chunk_id,
                     Embedding.chunk_type == "page",
-                    Embedding.is_current == True,
+                    Embedding.is_current.is_(True),
                     Embedding.model_name == self.embedding_service.model_name,
                 ),
             )
@@ -211,9 +209,7 @@ class RetrievalService:
                 _, chunk, page = keyword_data
 
             # Calculate combined score
-            combined_score = (keyword_weight * keyword_score) + (
-                vector_weight * vector_score
-            )
+            combined_score = (keyword_weight * keyword_score) + (vector_weight * vector_score)
 
             # Boost if found in both searches (indicates high relevance)
             if keyword_data and vector_data:
@@ -263,9 +259,7 @@ class RetrievalService:
         for chunk in chunks:
             # Format chunk with source attribution
             chunk_text = (
-                f"[Source: SVS-{chunk.svs_id} - {chunk.page_title}]\n"
-                f"Section: {chunk.section}\n"
-                f"{chunk.content}\n"
+                f"[Source: SVS-{chunk.svs_id} - {chunk.page_title}]\nSection: {chunk.section}\n{chunk.content}\n"
             )
 
             if total_chars + len(chunk_text) > max_chars:

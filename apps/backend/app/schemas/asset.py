@@ -1,6 +1,6 @@
 """Schemas for asset endpoints."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 from uuid import UUID
 

@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models import SvsPage
-from app.services.storage import get_storage_service, MinioStorageService
+from app.services.storage import MinioStorageService, get_storage_service
 from app.services.thumbnail import ThumbnailService
 
 router = APIRouter()

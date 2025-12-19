@@ -1,6 +1,6 @@
 """Text chunking for RAG embeddings."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 import hashlib
 import logging
@@ -55,9 +55,7 @@ class TextChunker:
         self.min_tokens = min_tokens
 
         # Sentence boundary pattern
-        self.sentence_pattern = re.compile(
-            r"(?<=[.!?])\s+(?=[A-Z])|(?<=[.!?])\s*$"
-        )
+        self.sentence_pattern = re.compile(r"(?<=[.!?])\s+(?=[A-Z])|(?<=[.!?])\s*$")
 
     def estimate_tokens(self, text: str) -> int:
         """Estimate token count for text."""
@@ -198,7 +196,6 @@ class TextChunker:
     ) -> list[TextChunk]:
         """Split a sentence that's too long into smaller chunks."""
         chunks = []
-        target_chars = self.target_tokens * CHARS_PER_TOKEN
 
         # Split on clause boundaries (commas, semicolons, etc.)
         clause_pattern = re.compile(r"[,;:]\s+")
@@ -234,7 +231,7 @@ class TextChunker:
         # Try to start at a word boundary
         space_idx = overlap.find(" ")
         if space_idx > 0:
-            overlap = overlap[space_idx + 1:]
+            overlap = overlap[space_idx + 1 :]
 
         return overlap + " "
 

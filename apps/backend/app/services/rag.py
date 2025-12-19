@@ -1,19 +1,17 @@
 """RAG service for retrieval-augmented generation."""
+
 from __future__ import annotations
 
-import json
 import logging
 import re
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import AsyncIterator
 
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.config import get_settings
-from app.models.chunk import PageTextChunk
 from app.models.page import SvsPage
 from app.schemas.chat import Citation
 from app.services.embedding import get_embedding_service
@@ -54,13 +52,16 @@ def get_llm_client():
 
     if backend == "openai":
         from openai import AsyncOpenAI
+
         return AsyncOpenAI(api_key=settings.openai_api_key), "openai"
     elif backend == "anthropic":
         from anthropic import AsyncAnthropic
+
         return AsyncAnthropic(api_key=settings.anthropic_api_key), "anthropic"
     elif backend == "ollama":
         # Use OpenAI client with Ollama endpoint
         from openai import AsyncOpenAI
+
         return AsyncOpenAI(
             api_key="ollama",
             base_url=f"{settings.ollama_base_url}/v1",
@@ -147,12 +148,9 @@ class RAGService:
     ) -> list[ChunkWithScore]:
         """Fallback retrieval using full-text search when no embeddings exist."""
         # Use PostgreSQL full-text search on svs_page
-        base_query = (
-            select(SvsPage)
-            .where(
-                SvsPage.status == "active",
-                SvsPage.search_vector.isnot(None),
-            )
+        base_query = select(SvsPage).where(
+            SvsPage.status == "active",
+            SvsPage.search_vector.isnot(None),
         )
 
         if context_svs_id:
@@ -160,10 +158,9 @@ class RAGService:
         else:
             # Full-text search
             from sqlalchemy import func
+
             ts_query = func.plainto_tsquery("english", query)
-            base_query = base_query.where(
-                SvsPage.search_vector.op("@@")(ts_query)
-            ).order_by(
+            base_query = base_query.where(SvsPage.search_vector.op("@@")(ts_query)).order_by(
                 func.ts_rank(SvsPage.search_vector, ts_query).desc()
             )
 
@@ -196,16 +193,12 @@ class RAGService:
         context_parts = []
         for chunk in chunks:
             context_parts.append(
-                f"[SVS-{chunk.svs_id}] {chunk.title}\n"
-                f"Section: {chunk.section}\n"
-                f"Content: {chunk.content}\n"
+                f"[SVS-{chunk.svs_id}] {chunk.title}\nSection: {chunk.section}\nContent: {chunk.content}\n"
             )
 
         return "\n---\n".join(context_parts)
 
-    async def generate_response_stream(
-        self, query: str, context: list[ChunkWithScore]
-    ) -> AsyncIterator[str]:
+    async def generate_response_stream(self, query: str, context: list[ChunkWithScore]) -> AsyncIterator[str]:
         """Generate streaming response from LLM (supports OpenAI and Anthropic)."""
         context_str = self.build_context_string(context)
         system_prompt = RAG_SYSTEM_PROMPT.format(context=context_str)
@@ -246,9 +239,7 @@ class RAGService:
             logger.error(f"Error generating response: {e}")
             yield f"I encountered an error while generating a response: {str(e)}"
 
-    def extract_citations(
-        self, response: str, context: list[ChunkWithScore]
-    ) -> list[Citation]:
+    def extract_citations(self, response: str, context: list[ChunkWithScore]) -> list[Citation]:
         """Extract citations from the response based on SVS-ID references."""
         # Find all [SVS-{id}] patterns in the response
         pattern = r"\[SVS-(\d+)\]"

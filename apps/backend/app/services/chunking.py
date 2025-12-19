@@ -1,11 +1,11 @@
 """Text chunking service for RAG."""
+
 from __future__ import annotations
 
 import hashlib
 import logging
 import re
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 import tiktoken
 from sqlalchemy import select
@@ -173,7 +173,7 @@ class ChunkingService:
 
         return chunks
 
-    async def chunk_asset(self, asset: "Asset") -> list[AssetTextChunk]:
+    async def chunk_asset(self, asset: Asset) -> list[AssetTextChunk]:
         """Create text chunks from an asset's text content."""
         chunks = []
 
@@ -209,9 +209,7 @@ class ChunkingService:
             return 0
 
         # Delete existing chunks for this page
-        await self.session.execute(
-            PageTextChunk.__table__.delete().where(PageTextChunk.svs_id == svs_id)
-        )
+        await self.session.execute(PageTextChunk.__table__.delete().where(PageTextChunk.svs_id == svs_id))
 
         # Create new chunks
         chunks = await self.chunk_page(page)

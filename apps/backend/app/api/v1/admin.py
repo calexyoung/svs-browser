@@ -1,8 +1,7 @@
 """Admin API endpoints."""
+
 from __future__ import annotations
 
-
-import asyncio
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
@@ -151,9 +150,7 @@ async def get_ingestion_status(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid run_id format")
 
-    result = await db.execute(
-        select(IngestRun).where(IngestRun.run_id == run_uuid)
-    )
+    result = await db.execute(select(IngestRun).where(IngestRun.run_id == run_uuid))
     run = result.scalar_one_or_none()
 
     if not run:
@@ -185,11 +182,7 @@ async def list_ingestion_runs(
 
     Requires admin API key authentication.
     """
-    result = await db.execute(
-        select(IngestRun)
-        .order_by(IngestRun.created_at.desc())
-        .limit(limit)
-    )
+    result = await db.execute(select(IngestRun).order_by(IngestRun.created_at.desc()).limit(limit))
     runs = result.scalars().all()
 
     return [

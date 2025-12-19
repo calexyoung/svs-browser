@@ -1,11 +1,12 @@
 """Chat/RAG API endpoints."""
+
 from __future__ import annotations
 
 import json
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -94,6 +95,7 @@ async def chat_query(
 
                 # Check for new citations in accumulated text
                 import re
+
                 matches = re.findall(r"\[SVS-(\d+)\]", response_text)
                 for svs_id_str in matches:
                     svs_id = int(svs_id_str)
@@ -102,22 +104,28 @@ async def chat_query(
                         for chunk in context:
                             if chunk.svs_id == svs_id:
                                 citations_sent.add(svs_id)
-                                citation_data = json.dumps({
-                                    "svs_id": chunk.svs_id,
-                                    "title": chunk.title,
-                                    "chunk_id": str(chunk.chunk_id),
-                                    "section": chunk.section,
-                                    "anchor": f"svs-{chunk.svs_id}",
-                                    "excerpt": chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content,
-                                })
+                                citation_data = json.dumps(
+                                    {
+                                        "svs_id": chunk.svs_id,
+                                        "title": chunk.title,
+                                        "chunk_id": str(chunk.chunk_id),
+                                        "section": chunk.section,
+                                        "anchor": f"svs-{chunk.svs_id}",
+                                        "excerpt": chunk.content[:200] + "..."
+                                        if len(chunk.content) > 200
+                                        else chunk.content,
+                                    }
+                                )
                                 yield f"event: citation\ndata: {citation_data}\n\n"
                                 break
 
             # Send done event
-            done_data = json.dumps({
-                "conversation_id": conversation_id,
-                "token_count": token_count,
-            })
+            done_data = json.dumps(
+                {
+                    "conversation_id": conversation_id,
+                    "token_count": token_count,
+                }
+            )
             yield f"event: done\ndata: {done_data}\n\n"
 
         except Exception as e:

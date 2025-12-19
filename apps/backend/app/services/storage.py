@@ -146,6 +146,7 @@ def get_storage_service() -> MinioStorageService:
     global _storage_service
     if _storage_service is None:
         from app.config import get_settings
+
         settings = get_settings()
         _storage_service = MinioStorageService(settings)
     return _storage_service

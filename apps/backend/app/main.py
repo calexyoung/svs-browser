@@ -1,9 +1,9 @@
 """FastAPI application entry point."""
+
 from __future__ import annotations
 
-
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +26,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         # Log but don't fail startup - thumbnails will fall back to external URLs
         import logging
+
         logging.getLogger(__name__).warning(f"Failed to initialize MinIO bucket: {e}")
 
     # TODO: Initialize database connection pool

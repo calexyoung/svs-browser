@@ -1,6 +1,6 @@
 """Tag models."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -45,9 +45,7 @@ class Tag(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     # Relationships
-    page_tags: Mapped[list["PageTag"]] = relationship(
-        "PageTag", back_populates="tag", cascade="all, delete-orphan"
-    )
+    page_tags: Mapped[list[PageTag]] = relationship("PageTag", back_populates="tag", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("tag_type", "normalized_value", name="uq_tag_type_value"),
@@ -65,14 +63,12 @@ class PageTag(Base, TimestampMixin):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    svs_id: Mapped[int] = mapped_column(
-        ForeignKey("svs_page.svs_id", ondelete="CASCADE")
-    )
+    svs_id: Mapped[int] = mapped_column(ForeignKey("svs_page.svs_id", ondelete="CASCADE"))
     tag_id: Mapped[UUID] = mapped_column(ForeignKey("tag.tag_id", ondelete="CASCADE"))
 
     # Relationships
-    page: Mapped["SvsPage"] = relationship("SvsPage", back_populates="tags")
-    tag: Mapped["Tag"] = relationship("Tag", back_populates="page_tags")
+    page: Mapped[SvsPage] = relationship("SvsPage", back_populates="tags")
+    tag: Mapped[Tag] = relationship("Tag", back_populates="page_tags")
 
     __table_args__ = (
         UniqueConstraint("svs_id", "tag_id", name="uq_page_tag"),

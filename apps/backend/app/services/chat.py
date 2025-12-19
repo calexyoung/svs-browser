@@ -1,12 +1,12 @@
 """Chat service with RAG using LangChain and multiple LLM backends."""
+
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import AsyncIterator
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from app.config import get_settings
 from app.services.retrieval import RetrievalService, RetrievedChunk
@@ -122,9 +122,7 @@ class ChatService:
             ChatResponse with answer and citations
         """
         # Retrieve relevant chunks
-        chunks, context = await self.retrieval_service.retrieve_for_context(
-            query, max_tokens=max_context_tokens
-        )
+        chunks, context = await self.retrieval_service.retrieve_for_context(query, max_tokens=max_context_tokens)
 
         # Build the prompt
         messages = self._build_messages(query, context, history)
@@ -155,9 +153,7 @@ class ChatService:
             String tokens as they are generated, then a final ChatResponse
         """
         # Retrieve relevant chunks
-        chunks, context = await self.retrieval_service.retrieve_for_context(
-            query, max_tokens=max_context_tokens
-        )
+        chunks, context = await self.retrieval_service.retrieve_for_context(query, max_tokens=max_context_tokens)
 
         # Build the prompt
         messages = self._build_messages(query, context, history)
@@ -204,9 +200,7 @@ class ChatService:
 
         return messages
 
-    def _build_citations(
-        self, chunks: list[RetrievedChunk], answer: str
-    ) -> list[Citation]:
+    def _build_citations(self, chunks: list[RetrievedChunk], answer: str) -> list[Citation]:
         """Build citations from retrieved chunks that were referenced in the answer."""
         citations = []
         seen_svs_ids = set()
@@ -221,9 +215,7 @@ class ChatService:
                         svs_id=chunk.svs_id,
                         title=chunk.page_title,
                         section=chunk.section,
-                        excerpt=chunk.content[:200] + "..."
-                        if len(chunk.content) > 200
-                        else chunk.content,
+                        excerpt=chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content,
                     )
                 )
 
@@ -237,9 +229,7 @@ class ChatService:
                             svs_id=chunk.svs_id,
                             title=chunk.page_title,
                             section=chunk.section,
-                            excerpt=chunk.content[:200] + "..."
-                            if len(chunk.content) > 200
-                            else chunk.content,
+                            excerpt=chunk.content[:200] + "..." if len(chunk.content) > 200 else chunk.content,
                         )
                     )
 

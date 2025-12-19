@@ -1,12 +1,12 @@
 """Schemas for SVS page endpoints."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 from datetime import date
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 class MediaType(str, Enum):

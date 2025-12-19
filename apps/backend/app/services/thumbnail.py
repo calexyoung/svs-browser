@@ -1,7 +1,6 @@
 """Thumbnail caching service for downloading and storing thumbnails in MinIO."""
 
 import logging
-import mimetypes
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -135,9 +134,7 @@ class ThumbnailService:
             # Check size
             data = response.content
             if len(data) > MAX_THUMBNAIL_SIZE:
-                logger.warning(
-                    f"Thumbnail too large for page {svs_id}: {len(data)} bytes"
-                )
+                logger.warning(f"Thumbnail too large for page {svs_id}: {len(data)} bytes")
                 return None
 
             if len(data) == 0:
@@ -146,23 +143,17 @@ class ThumbnailService:
 
             # Determine extension and content type
             ext = self._get_extension_from_url(thumbnail_url)
-            content_type = self._get_content_type(
-                ext, response.headers.get("content-type")
-            )
+            content_type = self._get_content_type(ext, response.headers.get("content-type"))
 
             # Build storage path and upload
             storage_path = self._build_storage_path(svs_id, ext)
             self.storage.upload_bytes(data, storage_path, content_type)
 
-            logger.info(
-                f"Cached thumbnail for page {svs_id}: {storage_path} ({len(data)} bytes)"
-            )
+            logger.info(f"Cached thumbnail for page {svs_id}: {storage_path} ({len(data)} bytes)")
             return storage_path
 
         except httpx.HTTPStatusError as e:
-            logger.warning(
-                f"HTTP error downloading thumbnail for page {svs_id}: {e.response.status_code}"
-            )
+            logger.warning(f"HTTP error downloading thumbnail for page {svs_id}: {e.response.status_code}")
             return None
         except httpx.RequestError as e:
             logger.warning(f"Request error downloading thumbnail for page {svs_id}: {e}")

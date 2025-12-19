@@ -4,14 +4,12 @@ import argparse
 import asyncio
 import logging
 import sys
-from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import get_settings
 from app.ingestion.api_client import SvsApiClient
 from app.ingestion.pipeline import IngestionPipeline, run_full_ingestion
-from app.models import Base
 
 # Configure logging
 logging.basicConfig(
@@ -197,7 +195,11 @@ async def cmd_cache_thumbnails(args: argparse.Namespace) -> int:
                 if (i + 1) % batch_size == 0:
                     await session.commit()
                     pct = ((i + 1) / total) * 100
-                    print(f"\rProgress: {i + 1}/{total} ({pct:.1f}%) - {success} cached, {errors} failed", end="", flush=True)
+                    print(
+                        f"\rProgress: {i + 1}/{total} ({pct:.1f}%) - {success} cached, {errors} failed",
+                        end="",
+                        flush=True,
+                    )
 
             # Final commit
             await session.commit()
@@ -241,7 +243,8 @@ def main() -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         help="Enable verbose logging",
     )
@@ -249,7 +252,7 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # discover command
-    discover_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "discover",
         help="Discover SVS pages from API",
     )
@@ -297,7 +300,7 @@ def main() -> int:
     )
 
     # test-api command
-    test_api_parser = subparsers.add_parser(
+    subparsers.add_parser(
         "test-api",
         help="Test SVS API connection",
     )

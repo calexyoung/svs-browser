@@ -1,11 +1,10 @@
 """Ingestion pipeline orchestrator."""
+
 from __future__ import annotations
 
-
-import asyncio
 import logging
+from collections.abc import Callable
 from datetime import datetime
-from typing import Callable
 from uuid import UUID
 
 from sqlalchemy import select
@@ -18,7 +17,6 @@ from app.models import (
     Asset,
     AssetFile,
     AssetThumbnail,
-    IngestItem,
     IngestRun,
     PageTag,
     PageTextChunk,
@@ -120,7 +118,6 @@ class IngestionPipeline:
         result = await self.session.execute(query)
         pages = result.scalars().all()
 
-        total = len(pages)
         processed = 0
         success = 0
         errors = 0
@@ -169,9 +166,7 @@ class IngestionPipeline:
         **kwargs,
     ) -> None:
         """Update run status and metrics."""
-        result = await self.session.execute(
-            select(IngestRun).where(IngestRun.run_id == run_id)
-        )
+        result = await self.session.execute(select(IngestRun).where(IngestRun.run_id == run_id))
         run = result.scalar_one_or_none()
         if run:
             run.status = status
@@ -182,9 +177,7 @@ class IngestionPipeline:
 
     async def _upsert_page_from_api(self, result: SvsSearchResult) -> SvsPage:
         """Create or update page from API result."""
-        existing = await self.session.execute(
-            select(SvsPage).where(SvsPage.svs_id == result.id)
-        )
+        existing = await self.session.execute(select(SvsPage).where(SvsPage.svs_id == result.id))
         page = existing.scalar_one_or_none()
 
         if page:
@@ -225,10 +218,7 @@ class IngestionPipeline:
         page.content_json = parsed.content_json  # Rich HTML content
         page.published_date = parsed.published_date
         page.thumbnail_url = parsed.thumbnail_url
-        page.credits_json = [
-            {"role": c.role, "name": c.name, "organization": c.organization}
-            for c in parsed.credits
-        ]
+        page.credits_json = [{"role": c.role, "name": c.name, "organization": c.organization} for c in parsed.credits]
         page.html_crawled_at = datetime.utcnow()
         page.last_checked_at = datetime.utcnow()
 
@@ -343,9 +333,7 @@ class IngestionPipeline:
         """Process related page links."""
         for related in parsed.related_pages:
             # Check if target page exists
-            result = await self.session.execute(
-                select(SvsPage).where(SvsPage.svs_id == related.svs_id)
-            )
+            result = await self.session.execute(select(SvsPage).where(SvsPage.svs_id == related.svs_id))
             target = result.scalar_one_or_none()
 
             if not target:
@@ -508,8 +496,7 @@ class IngestionPipeline:
         # Update credits if currently empty or missing
         if not page.credits_json and parsed.credits:
             page.credits_json = [
-                {"role": c.role, "name": c.name, "organization": c.organization}
-                for c in parsed.credits
+                {"role": c.role, "name": c.name, "organization": c.organization} for c in parsed.credits
             ]
 
         page.last_checked_at = datetime.utcnow()

@@ -1,8 +1,7 @@
 """Asset models."""
+
 from __future__ import annotations
 
-
-from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -37,9 +36,7 @@ class Asset(Base, TimestampMixin):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    svs_id: Mapped[int] = mapped_column(
-        ForeignKey("svs_page.svs_id", ondelete="CASCADE")
-    )
+    svs_id: Mapped[int] = mapped_column(ForeignKey("svs_page.svs_id", ondelete="CASCADE"))
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Rich caption with HTML formatting preserved
@@ -59,14 +56,12 @@ class Asset(Base, TimestampMixin):
     metadata_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     # Relationships
-    page: Mapped["SvsPage"] = relationship("SvsPage", back_populates="assets")
-    files: Mapped[list["AssetFile"]] = relationship(
-        "AssetFile", back_populates="asset", cascade="all, delete-orphan"
-    )
-    thumbnails: Mapped[list["AssetThumbnail"]] = relationship(
+    page: Mapped[SvsPage] = relationship("SvsPage", back_populates="assets")
+    files: Mapped[list[AssetFile]] = relationship("AssetFile", back_populates="asset", cascade="all, delete-orphan")
+    thumbnails: Mapped[list[AssetThumbnail]] = relationship(
         "AssetThumbnail", back_populates="asset", cascade="all, delete-orphan"
     )
-    text_chunks: Mapped[list["AssetTextChunk"]] = relationship(
+    text_chunks: Mapped[list[AssetTextChunk]] = relationship(
         "AssetTextChunk", back_populates="asset", cascade="all, delete-orphan"
     )
 
@@ -97,20 +92,16 @@ class AssetFile(Base, TimestampMixin):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    asset_id: Mapped[UUID] = mapped_column(
-        ForeignKey("asset.asset_id", ondelete="CASCADE")
-    )
+    asset_id: Mapped[UUID] = mapped_column(ForeignKey("asset.asset_id", ondelete="CASCADE"))
     variant: Mapped[str] = mapped_column(String(50))
     file_url: Mapped[str] = mapped_column(String(1000))
-    storage_uri: Mapped[str | None] = mapped_column(
-        String(1000), nullable=True
-    )  # For future local storage
+    storage_uri: Mapped[str | None] = mapped_column(String(1000), nullable=True)  # For future local storage
     mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     filename: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Relationships
-    asset: Mapped["Asset"] = relationship("Asset", back_populates="files")
+    asset: Mapped[Asset] = relationship("Asset", back_populates="files")
 
     __table_args__ = (
         Index("ix_asset_file_asset_id", "asset_id"),
@@ -127,15 +118,13 @@ class AssetThumbnail(Base, TimestampMixin):
         primary_key=True,
         server_default=text("gen_random_uuid()"),
     )
-    asset_id: Mapped[UUID] = mapped_column(
-        ForeignKey("asset.asset_id", ondelete="CASCADE")
-    )
+    asset_id: Mapped[UUID] = mapped_column(ForeignKey("asset.asset_id", ondelete="CASCADE"))
     url: Mapped[str] = mapped_column(String(1000))
     storage_uri: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     width: Mapped[int] = mapped_column()
     height: Mapped[int] = mapped_column()
 
     # Relationships
-    asset: Mapped["Asset"] = relationship("Asset", back_populates="thumbnails")
+    asset: Mapped[Asset] = relationship("Asset", back_populates="thumbnails")
 
     __table_args__ = (Index("ix_asset_thumbnail_asset_id", "asset_id"),)

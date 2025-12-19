@@ -1,11 +1,11 @@
 """SVS API client for discovering and fetching visualization pages."""
+
 from __future__ import annotations
 
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -76,7 +76,7 @@ class SvsApiClient:
         self.timeout = timeout
         self._client: httpx.AsyncClient | None = None
 
-    async def __aenter__(self) -> "SvsApiClient":
+    async def __aenter__(self) -> SvsApiClient:
         """Enter async context manager."""
         self._client = httpx.AsyncClient(
             timeout=self.timeout,
@@ -118,8 +118,7 @@ class SvsApiClient:
                     # Retry on rate limit or server errors
                     wait_time = self.retry_delay * (2**attempt)
                     logger.warning(
-                        f"HTTP {e.response.status_code} on attempt {attempt + 1}, "
-                        f"retrying in {wait_time}s: {url}"
+                        f"HTTP {e.response.status_code} on attempt {attempt + 1}, retrying in {wait_time}s: {url}"
                     )
                     await asyncio.sleep(wait_time)
                 else:
@@ -128,10 +127,7 @@ class SvsApiClient:
             except httpx.RequestError as e:
                 last_error = e
                 wait_time = self.retry_delay * (2**attempt)
-                logger.warning(
-                    f"Request error on attempt {attempt + 1}, "
-                    f"retrying in {wait_time}s: {e}"
-                )
+                logger.warning(f"Request error on attempt {attempt + 1}, retrying in {wait_time}s: {e}")
                 await asyncio.sleep(wait_time)
 
         raise last_error or RuntimeError("Request failed after retries")

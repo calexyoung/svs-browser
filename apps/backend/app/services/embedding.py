@@ -1,11 +1,10 @@
 """Embedding service supporting local (sentence-transformers) and OpenAI backends."""
+
 from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
-
-import numpy as np
 
 from app.config import get_settings
 
@@ -24,9 +23,7 @@ class BaseEmbeddingService(ABC):
         pass
 
     @abstractmethod
-    async def batch_generate_embeddings(
-        self, texts: list[str], batch_size: int = 32
-    ) -> list[list[float]]:
+    async def batch_generate_embeddings(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
         """Generate embeddings for multiple texts in batches."""
         pass
 
@@ -94,9 +91,7 @@ class LocalEmbeddingService(BaseEmbeddingService):
             logger.error(f"Failed to generate embedding: {e}")
             raise
 
-    async def batch_generate_embeddings(
-        self, texts: list[str], batch_size: int = 32
-    ) -> list[list[float]]:
+    async def batch_generate_embeddings(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
         """Generate embeddings for multiple texts in batches."""
         self._load_model()
 
@@ -156,9 +151,7 @@ class OpenAIEmbeddingService(BaseEmbeddingService):
             logger.error(f"Failed to generate embedding: {e}")
             raise
 
-    async def batch_generate_embeddings(
-        self, texts: list[str], batch_size: int = 100
-    ) -> list[list[float]]:
+    async def batch_generate_embeddings(self, texts: list[str], batch_size: int = 100) -> list[list[float]]:
         """Generate embeddings for multiple texts in batches."""
         all_embeddings = []
 

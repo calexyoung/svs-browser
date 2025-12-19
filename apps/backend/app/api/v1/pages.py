@@ -1,6 +1,6 @@
 """SVS Page API endpoints."""
-from __future__ import annotations
 
+from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
