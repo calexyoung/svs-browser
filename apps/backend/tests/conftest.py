@@ -1,9 +1,8 @@
 """Pytest configuration and fixtures."""
 
-import asyncio
-from collections.abc import AsyncGenerator, Generator
+from collections.abc import AsyncGenerator
 
-import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -22,45 +21,33 @@ else:
     TEST_DATABASE_URL = settings.database_url.replace("/svs_browser", "/svs_browser_test")
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create an event loop for the test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
+# Create engine once for all tests
+_test_engine = None
+_async_session_maker = None
 
 
-@pytest.fixture(scope="session")
-async def test_engine():
-    """Create test database engine."""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-    yield engine
-
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-    await engine.dispose()
-
-
-@pytest.fixture
-async def db_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
+@pytest_asyncio.fixture(scope="function")
+async def db_session() -> AsyncGenerator[AsyncSession, None]:
     """Create a test database session."""
-    async_session_maker = async_sessionmaker(
-        test_engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
+    global _test_engine, _async_session_maker
 
-    async with async_session_maker() as session:
+    if _test_engine is None:
+        _test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+        _async_session_maker = async_sessionmaker(
+            _test_engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+        # Create tables
+        async with _test_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+    async with _async_session_maker() as session:
         yield session
         await session.rollback()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """Create a test client with database session override."""
 
