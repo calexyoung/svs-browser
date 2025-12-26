@@ -105,9 +105,27 @@ class PageService:
                 )
                 for f in asset.files
             ]
+            # Prefer actual thumbnail/web files over the asset_thumbnail table
+            # which often contains "no_preview" placeholders
             thumbnail_url = None
-            if asset.thumbnails:
-                thumbnail_url = asset.thumbnails[0].url
+            for variant in ["thumbnail", "web", "preview", "lores"]:
+                for f in asset.files:
+                    if f.variant == variant and f.file_url:
+                        thumbnail_url = f.file_url
+                        break
+                if thumbnail_url:
+                    break
+            # Fall back to asset_thumbnail only if it's not a "no_preview" placeholder
+            if not thumbnail_url and asset.thumbnails:
+                thumb_url = asset.thumbnails[0].url
+                if thumb_url and "no_preview" not in thumb_url:
+                    thumbnail_url = thumb_url
+            # Last resort: use original image (if it's an image)
+            if not thumbnail_url and asset.media_type == "image":
+                for f in asset.files:
+                    if f.variant == "original" and f.file_url:
+                        thumbnail_url = f.file_url
+                        break
 
             assets.append(
                 AssetBrief(

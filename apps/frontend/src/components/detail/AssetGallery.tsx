@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import {
   Play,
   ImageIcon,
@@ -245,6 +245,7 @@ function AssetCard({
 
 export function AssetGallery({ assets, className }: AssetGalleryProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const lightboxRef = useRef<HTMLDivElement>(null);
 
   // Separate assets by type
   const mediaAssets = assets.filter(a => a.type === "video" || a.type === "image");
@@ -256,17 +257,38 @@ export function AssetGallery({ assets, className }: AssetGalleryProps) {
     if (index >= 0) setLightboxIndex(index);
   };
 
-  const closeLightbox = () => setLightboxIndex(null);
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape") closeLightbox();
-    if (e.key === "ArrowLeft" && lightboxIndex !== null && lightboxIndex > 0) {
+  const goToPrevious = useCallback(() => {
+    if (lightboxIndex !== null && lightboxIndex > 0) {
       setLightboxIndex(lightboxIndex - 1);
     }
-    if (e.key === "ArrowRight" && lightboxIndex !== null && lightboxIndex < imageAssets.length - 1) {
+  }, [lightboxIndex]);
+
+  const goToNext = useCallback(() => {
+    if (lightboxIndex !== null && lightboxIndex < imageAssets.length - 1) {
       setLightboxIndex(lightboxIndex + 1);
     }
-  };
+  }, [lightboxIndex, imageAssets.length]);
+
+  // Auto-focus lightbox when it opens for keyboard navigation
+  useEffect(() => {
+    if (lightboxIndex !== null && lightboxRef.current) {
+      lightboxRef.current.focus();
+    }
+  }, [lightboxIndex]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Escape") closeLightbox();
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      goToPrevious();
+    }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      goToNext();
+    }
+  }, [closeLightbox, goToPrevious, goToNext]);
 
   return (
     <div className={cn("space-y-8", className)}>
@@ -325,34 +347,40 @@ export function AssetGallery({ assets, className }: AssetGalleryProps) {
       {/* Lightbox */}
       {lightboxIndex !== null && imageAssets[lightboxIndex] && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95"
+          ref={lightboxRef}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 outline-none"
           onClick={closeLightbox}
           onKeyDown={handleKeyDown}
           tabIndex={0}
           role="dialog"
           aria-modal="true"
+          aria-label="Image lightbox"
         >
           {/* Close button */}
           <button
-            onClick={closeLightbox}
-            className="absolute right-4 top-4 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+            onClick={(e) => { e.stopPropagation(); closeLightbox(); }}
+            className="absolute right-4 top-4 z-20 rounded-full bg-white/10 p-3 text-white hover:bg-white/20 transition-colors"
+            aria-label="Close lightbox"
           >
             <X className="h-6 w-6" />
           </button>
 
-          {/* Navigation */}
+          {/* Navigation - Previous */}
           {lightboxIndex > 0 && (
             <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex - 1); }}
-              className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white hover:bg-white/20"
+              onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
+              className="absolute left-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/10 p-4 text-white hover:bg-white/30 transition-colors sm:left-4"
+              aria-label="Previous image"
             >
               <ChevronLeft className="h-8 w-8" />
             </button>
           )}
+          {/* Navigation - Next */}
           {lightboxIndex < imageAssets.length - 1 && (
             <button
-              onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex + 1); }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/10 p-3 text-white hover:bg-white/20"
+              onClick={(e) => { e.stopPropagation(); goToNext(); }}
+              className="absolute right-2 top-1/2 z-20 -translate-y-1/2 rounded-full bg-white/10 p-4 text-white hover:bg-white/30 transition-colors sm:right-4"
+              aria-label="Next image"
             >
               <ChevronRight className="h-8 w-8" />
             </button>
