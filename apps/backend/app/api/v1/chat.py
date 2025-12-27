@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.middleware.rate_limit import rate_limit_chat
 from app.services.rag import RAGService
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ class ChatRequest(BaseModel):
     settings: dict | None = Field(None, description="Optional LLM settings")
 
 
-@router.post("/chat/query")
+@router.post("/chat/query", dependencies=[Depends(rate_limit_chat)])
 async def chat_query(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db),
@@ -144,7 +145,7 @@ async def chat_query(
     )
 
 
-@router.post("/chat/query/sync")
+@router.post("/chat/query/sync", dependencies=[Depends(rate_limit_chat)])
 async def chat_query_sync(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db),

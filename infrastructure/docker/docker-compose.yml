@@ -1,59 +1,69 @@
-version: "3.9"
+# SVS Browser - Docker Compose Configuration
+#
+# All external ports are configurable via environment variables to avoid conflicts.
+# Copy .env.example to .env and adjust ports as needed.
 
 services:
+  # PostgreSQL with pgvector
   postgres:
     image: pgvector/pgvector:pg16
     container_name: svs-postgres
     environment:
+      POSTGRES_DB: ${POSTGRES_DB:-svs_browser}
       POSTGRES_USER: ${POSTGRES_USER:-svs}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-svspassword}
-      POSTGRES_DB: ${POSTGRES_DB:-svs_browser}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - svs_postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-svs} -d ${POSTGRES_DB:-svs_browser}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
+  # Redis for caching and rate limiting
   redis:
     image: redis:7-alpine
     container_name: svs-redis
     ports:
-      - "6380:6379"
+      - "${REDIS_PORT:-6380}:6379"
     volumes:
-      - redis_data:/data
+      - svs_redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
+  # MinIO for object storage (thumbnails, assets)
   minio:
     image: minio/minio:latest
     container_name: svs-minio
-    command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
-      - minio_data:/data
+      - svs_minio_data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
 
+  # FastAPI Backend
   backend:
     build:
       context: ../../apps/backend
       dockerfile: Dockerfile
+      target: development
     container_name: svs-backend
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-svs}:${POSTGRES_PASSWORD:-svspassword}@postgres:5432/${POSTGRES_DB:-svs_browser}
@@ -61,19 +71,15 @@ services:
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-svs-assets}
+      MINIO_SECURE: "false"
       EMBEDDING_BACKEND: ${EMBEDDING_BACKEND:-local}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-large-en-v1.5}
-      EMBEDDING_DIMS: ${EMBEDDING_DIMS:-1024}
       LLM_BACKEND: ${LLM_BACKEND:-openai}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o}
-      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      ADMIN_API_KEY: ${ADMIN_API_KEY:-dev-admin-key}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      DEBUG: ${DEBUG:-false}
     ports:
-      - "8010:8000"
+      - "${BACKEND_PORT:-8010}:8000"
     volumes:
       - ../../apps/backend:/app
     depends_on:
@@ -81,25 +87,46 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
 
+  # Next.js Frontend
   frontend:
     build:
       context: ../../apps/frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:${BACKEND_PORT:-8010}/api/v1
     container_name: svs-frontend
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8010/api/v1}
+      NEXT_PUBLIC_API_URL: http://localhost:${BACKEND_PORT:-8010}/api/v1
     ports:
-      - "3010:3000"
+      - "${FRONTEND_PORT:-3010}:3000"
     depends_on:
       - backend
+    restart: unless-stopped
+
+  # Frontend development mode (alternative to production build)
+  frontend-dev:
+    image: node:20-alpine
+    container_name: svs-frontend-dev
+    working_dir: /app
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:${BACKEND_PORT:-8010}/api/v1
+    ports:
+      - "${FRONTEND_PORT:-3010}:3000"
+    volumes:
+      - ../../apps/frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - backend
+    profiles:
+      - dev
 
 volumes:
-  postgres_data:
-  redis_data:
-  minio_data:
+  svs_postgres_data:
+  svs_redis_data:
+  svs_minio_data:

@@ -208,3 +208,42 @@ export async function getPage(svsId: number): Promise<SvsPageDetail> {
 export async function healthCheck(): Promise<{ status: string }> {
   return fetchApi<{ status: string }>("/health");
 }
+
+/**
+ * Browse parameters (no query required)
+ */
+export interface BrowseParams {
+  media_types?: string[];
+  domains?: string[];
+  missions?: string[];
+  date_from?: string;
+  date_to?: string;
+  sort?: "date_desc" | "date_asc";
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Browse SVS content (list all pages with optional filters)
+ */
+export async function browse(params: BrowseParams = {}): Promise<SearchResponse> {
+  const searchParams = new URLSearchParams();
+
+  if (params.media_types?.length) {
+    params.media_types.forEach((t) => searchParams.append("media_type", t));
+  }
+  if (params.domains?.length) {
+    params.domains.forEach((d) => searchParams.append("domain", d));
+  }
+  if (params.missions?.length) {
+    params.missions.forEach((m) => searchParams.append("mission", m));
+  }
+  if (params.date_from) searchParams.set("date_from", params.date_from);
+  if (params.date_to) searchParams.set("date_to", params.date_to);
+  if (params.sort) searchParams.set("sort", params.sort);
+  if (params.limit) searchParams.set("limit", params.limit.toString());
+  if (params.offset) searchParams.set("offset", params.offset.toString());
+
+  const queryString = searchParams.toString();
+  return fetchApi<SearchResponse>(`/browse${queryString ? `?${queryString}` : ""}`);
+}

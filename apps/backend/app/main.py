@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import admin, assets, chat, pages, search, thumbnails
 from app.config import get_settings
+from app.database import close_database_connection, verify_database_connection
+from app.middleware.headers import RateLimitHeadersMiddleware
+from app.redis import close_redis, init_redis, verify_redis_connection
+from app.services.embedding import preload_embedding_model
 from app.services.storage import get_storage_service
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
@@ -19,23 +25,48 @@ settings = get_settings()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler for startup/shutdown events."""
     # Startup
+    logger.info("Starting SVS Browser API...")
+
     # Initialize MinIO bucket for thumbnail storage
     try:
         storage = get_storage_service()
         storage.ensure_bucket_exists()
+        logger.info("MinIO storage initialized")
     except Exception as e:
         # Log but don't fail startup - thumbnails will fall back to external URLs
-        import logging
+        logger.warning(f"Failed to initialize MinIO bucket: {e}")
 
-        logging.getLogger(__name__).warning(f"Failed to initialize MinIO bucket: {e}")
+    # Verify database connection
+    db_ok = await verify_database_connection()
+    if not db_ok:
+        logger.error("Database connection failed - application may not function correctly")
 
-    # TODO: Initialize database connection pool
-    # TODO: Initialize Redis connection
-    # TODO: Load embedding model
+    # Initialize Redis connection
+    redis_ok = await init_redis()
+    if not redis_ok:
+        logger.warning("Redis connection failed - caching will be disabled")
+
+    # Preload embedding model (for local backend only)
+    # This is done in a non-blocking way to avoid slowing startup
+    try:
+        preload_embedding_model()
+    except Exception as e:
+        logger.warning(f"Embedding model preload failed: {e}")
+
+    logger.info("SVS Browser API startup complete")
+
     yield
+
     # Shutdown
-    # TODO: Close database connections
-    # TODO: Close Redis connection
+    logger.info("Shutting down SVS Browser API...")
+
+    # Close Redis connection
+    await close_redis()
+
+    # Close database connections
+    await close_database_connection()
+
+    logger.info("SVS Browser API shutdown complete")
 
 
 app = FastAPI(
@@ -56,6 +87,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Rate limit headers middleware
+app.add_middleware(RateLimitHeadersMiddleware)
+
 # Include API routers
 app.include_router(search.router, prefix="/api/v1", tags=["search"])
 app.include_router(pages.router, prefix="/api/v1", tags=["pages"])
@@ -72,8 +106,32 @@ async def health_check() -> dict[str, str]:
 
 
 @app.get("/ready")
-async def readiness_check() -> dict[str, str]:
-    """Readiness check endpoint."""
-    # TODO: Check database connection
-    # TODO: Check Redis connection
-    return {"status": "ready"}
+async def readiness_check() -> dict[str, str | bool]:
+    """
+    Readiness check endpoint.
+
+    Verifies that all required services are available and responding.
+    Returns 503 if any critical service is unavailable.
+    """
+    db_ok = await verify_database_connection()
+    redis_ok = await verify_redis_connection()
+
+    status = {
+        "status": "ready" if db_ok else "degraded",
+        "database": db_ok,
+        "redis": redis_ok,
+    }
+
+    # Database is required; Redis is optional (caching only)
+    if not db_ok:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "not ready",
+                "database": db_ok,
+                "redis": redis_ok,
+                "message": "Database connection unavailable",
+            },
+        )
+
+    return status

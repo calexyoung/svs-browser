@@ -12,9 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.database import get_db
 from app.ingestion.pipeline import IngestionPipeline
+from app.middleware.rate_limit import rate_limit_admin
 from app.models import IngestRun
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(rate_limit_admin)])
 settings = get_settings()
 
 

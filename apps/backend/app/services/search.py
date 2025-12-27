@@ -156,6 +156,71 @@ class SearchService:
             previous=prev_url,
         )
 
+    async def browse(
+        self,
+        media_types: list[MediaType] | None = None,
+        domain: str | None = None,
+        mission: str | None = None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+        sort: SortOption = SortOption.DATE_DESC,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> SearchResponse:
+        """
+        Browse all SVS pages without a search query.
+
+        Returns all crawled pages with optional filtering.
+        """
+        # Base query - only include crawled pages with content
+        base_query = select(SvsPage).where(
+            SvsPage.status == "active",
+            SvsPage.html_crawled_at.isnot(None),  # Only crawled pages
+        )
+
+        # Apply filters
+        base_query = self._apply_filters(base_query, media_types, domain, mission, date_from, date_to)
+
+        # Get total count before pagination
+        count_query = select(func.count()).select_from(base_query.subquery())
+        count_result = await self.session.execute(count_query)
+        total_count = count_result.scalar() or 0
+
+        # Apply sorting (no search_term since there's no query)
+        base_query = self._apply_sorting(base_query, sort, None)
+
+        # Apply pagination
+        base_query = base_query.offset(offset).limit(limit)
+
+        # Load relationships for results
+        base_query = base_query.options(
+            selectinload(SvsPage.assets).selectinload(Asset.thumbnails),
+            selectinload(SvsPage.tags).selectinload(PageTag.tag),
+        )
+
+        # Execute query
+        result = await self.session.execute(base_query)
+        pages = result.scalars().all()
+
+        # Format results (empty query for snippet generation)
+        results = self._format_results(pages, "")
+
+        # Get facets (empty query)
+        facets = await self._get_browse_facets(date_from, date_to)
+
+        # Build pagination URLs
+        next_url, prev_url = self._build_browse_pagination_urls(
+            media_types, domain, mission, date_from, date_to, sort, limit, offset, total_count
+        )
+
+        return SearchResponse(
+            count=total_count,
+            results=results,
+            facets=facets,
+            next=next_url,
+            previous=prev_url,
+        )
+
     async def _search_by_id(self, svs_id: int, limit: int, offset: int) -> SearchResponse:
         """Search for a specific SVS ID."""
         query = (
@@ -502,6 +567,109 @@ class SearchService:
             base += f"&sort={sort.value}"
 
         base += f"&limit={limit}"
+
+        next_url = None
+        prev_url = None
+
+        if offset + limit < total_count:
+            next_url = f"{base}&offset={offset + limit}"
+        if offset > 0:
+            prev_url = f"{base}&offset={max(0, offset - limit)}"
+
+        return next_url, prev_url
+
+    async def _get_browse_facets(
+        self,
+        date_from: date | None,
+        date_to: date | None,
+    ) -> SearchFacets:
+        """Get facet counts for browse filters (no search query)."""
+        # Build base filter for browsing
+        base_filter = [
+            SvsPage.status == "active",
+            SvsPage.html_crawled_at.isnot(None),
+        ]
+
+        if date_from:
+            base_filter.append(SvsPage.published_date >= date_from)
+        if date_to:
+            base_filter.append(SvsPage.published_date <= date_to)
+
+        # Media type facets
+        media_type_query = (
+            select(Asset.media_type, func.count(func.distinct(Asset.svs_id)))
+            .join(SvsPage, SvsPage.svs_id == Asset.svs_id)
+            .where(*base_filter)
+            .group_by(Asset.media_type)
+        )
+        media_result = await self.session.execute(media_type_query)
+        media_facets = {row[0]: row[1] for row in media_result.all()}
+
+        # Domain facets
+        domain_query = (
+            select(Tag.value, func.count(func.distinct(PageTag.svs_id)))
+            .join(PageTag, PageTag.tag_id == Tag.tag_id)
+            .join(SvsPage, SvsPage.svs_id == PageTag.svs_id)
+            .where(*base_filter, Tag.tag_type == "domain")
+            .group_by(Tag.value)
+            .order_by(func.count(func.distinct(PageTag.svs_id)).desc())
+            .limit(20)
+        )
+        domain_result = await self.session.execute(domain_query)
+        domain_facets = {row[0]: row[1] for row in domain_result.all()}
+
+        # Mission facets
+        mission_query = (
+            select(Tag.value, func.count(func.distinct(PageTag.svs_id)))
+            .join(PageTag, PageTag.tag_id == Tag.tag_id)
+            .join(SvsPage, SvsPage.svs_id == PageTag.svs_id)
+            .where(*base_filter, Tag.tag_type == "mission")
+            .group_by(Tag.value)
+            .order_by(func.count(func.distinct(PageTag.svs_id)).desc())
+            .limit(20)
+        )
+        mission_result = await self.session.execute(mission_query)
+        mission_facets = {row[0]: row[1] for row in mission_result.all()}
+
+        return SearchFacets(
+            media_type=media_facets,
+            domain=domain_facets,
+            mission=mission_facets,
+        )
+
+    def _build_browse_pagination_urls(
+        self,
+        media_types: list[MediaType] | None,
+        domain: str | None,
+        mission: str | None,
+        date_from: date | None,
+        date_to: date | None,
+        sort: SortOption,
+        limit: int,
+        offset: int,
+        total_count: int,
+    ) -> tuple[str | None, str | None]:
+        """Build pagination URLs for browse endpoint."""
+        base = "/api/v1/browse?"
+
+        params = []
+        if media_types:
+            for mt in media_types:
+                params.append(f"media_type={mt.value}")
+        if domain:
+            params.append(f"domain={domain}")
+        if mission:
+            params.append(f"mission={mission}")
+        if date_from:
+            params.append(f"date_from={date_from}")
+        if date_to:
+            params.append(f"date_to={date_to}")
+        if sort != SortOption.DATE_DESC:
+            params.append(f"sort={sort.value}")
+
+        params.append(f"limit={limit}")
+
+        base += "&".join(params)
 
         next_url = None
         prev_url = None

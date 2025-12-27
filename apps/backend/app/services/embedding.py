@@ -192,3 +192,26 @@ def get_embedding_service() -> BaseEmbeddingService:
             raise ValueError(f"Unknown embedding backend: {settings.embedding_backend}")
         logger.info(f"Initialized embedding service: {settings.embedding_backend}")
     return _embedding_service
+
+
+def preload_embedding_model() -> bool:
+    """
+    Preload the embedding model on startup.
+
+    This avoids cold-start latency on the first embedding request.
+    Only applicable for local embedding backend.
+    """
+    settings = get_settings()
+    if settings.embedding_backend != "local":
+        logger.info(f"Skipping embedding preload for backend: {settings.embedding_backend}")
+        return True
+
+    try:
+        service = get_embedding_service()
+        if isinstance(service, LocalEmbeddingService):
+            service._load_model()
+            logger.info("Embedding model preloaded successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to preload embedding model: {e}")
+        return False

@@ -511,4 +511,20 @@ export function clearAllData(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(FAVORITES_KEY);
   localStorage.removeItem(GALLERIES_KEY);
+  // Reset caches
+  cachedFavorites = {};
+  cachedFavoritesRaw = null;
+  cachedGalleries = {};
+  cachedGalleriesRaw = null;
+}
+
+/**
+ * Reset caches (for testing)
+ * @internal
+ */
+export function _resetCache(): void {
+  cachedFavorites = {};
+  cachedFavoritesRaw = null;
+  cachedGalleries = {};
+  cachedGalleriesRaw = null;
 }

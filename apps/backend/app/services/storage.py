@@ -4,6 +4,7 @@ import io
 import logging
 from typing import TYPE_CHECKING
 
+import httpx
 from minio import Minio
 from minio.error import S3Error
 
@@ -131,6 +132,45 @@ class MinioStorageService:
         except S3Error as e:
             logger.error(f"Failed to delete object {object_name}: {e}")
             raise
+
+    async def upload_from_url(
+        self,
+        source_url: str,
+        object_name: str,
+        timeout: float = 30.0,
+    ) -> tuple[bool, str | None]:
+        """Download content from URL and upload to MinIO.
+
+        Args:
+            source_url: URL to download from.
+            object_name: Path in MinIO bucket.
+            timeout: HTTP request timeout.
+
+        Returns:
+            Tuple of (success, content_type on success or error message on failure).
+        """
+        try:
+            async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+                response = await client.get(source_url)
+                response.raise_for_status()
+
+                content = response.content
+                content_type = response.headers.get("content-type", "application/octet-stream")
+
+                # Upload to MinIO
+                self.upload_bytes(content, object_name, content_type)
+                logger.debug(f"Uploaded from URL {source_url} to {object_name} ({len(content)} bytes)")
+                return True, content_type
+
+        except httpx.HTTPStatusError as e:
+            logger.warning(f"HTTP error downloading {source_url}: {e.response.status_code}")
+            return False, f"HTTP {e.response.status_code}"
+        except httpx.RequestError as e:
+            logger.warning(f"Request error downloading {source_url}: {e}")
+            return False, str(e)
+        except S3Error as e:
+            logger.error(f"MinIO error uploading {object_name}: {e}")
+            return False, str(e)
 
 
 # Singleton instance (lazy initialization)
